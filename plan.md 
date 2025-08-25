@@ -1,0 +1,54 @@
+1) PLAN
+
+Requirements (bullets)
+
+Build a RAG-based chatbot agent named “Personal Codex — Candidate Agent” that answers questions about the candidate based on uploaded personal documents.
+Support ingestion of documents in .pdf, .docx, .txt formats.
+Chunk text using sentence boundaries, targeting ~450 tokens per chunk with 50 token overlap.
+Use OpenAI's text-embedding-3-small model for embeddings.
+Store vectors in a FAISS index for efficient retrieval.
+Implement retrieval of relevant chunks to augment LLM prompts for question answering.
+Use an LLM (OpenAI's gpt-4o-mini by default) to generate responses in the candidate's voice.
+Provide a Streamlit UI with: sidebar for multiple file uploads and a "Re-run ingest" button; main panel for user question input, mode switcher (interview: concise/professional; story: reflective/narrative; fast: bullet points; humble_brag: confident/self-promotional), and display of responses.
+Include bonus mode switcher as specified in the brief.
+Ensure the agent refers to provided materials and speaks in an authentic voice.
+Create supporting artifacts: prompt history, examples, agent instructions, commit log.
+Include a README explaining setup, design, samples, improvements.
+Add basic tests for chunking and retrieval.
+Follow AI-native workflow by simulating AI-assisted artifacts.
+Deployable via Streamlit; assume local run for now.
+
+
+Assumptions
+
+-No personal data is provided initially; the app allows runtime uploads of CV, blog posts, etc., as per the brief's "inputs" section.
+-OpenAI API key is required and will be loaded from .env.
+-LLM model is gpt-4o-mini for cost-efficiency; embeddings use text-embedding-3-small.
+-Token counting uses tiktoken for OpenAI compatibility.
+-FAISS is used locally without persistence (in-memory for simplicity); re-ingest on each run or button press.
+-Streamlit is chosen for quick UI prototyping as per brief suggestions.
+-Sentence chunking uses NLTK for boundary detection.
+-No authentication/security for uploads since it's a prototype.
+-Artifacts are skeleton/mock based on simulated AI collaboration.
+-Tests use pytest.
+
+
+Risks & mitigations 
+
+Risk: High token costs for large documents. Mitigation: Limit chunk size, use efficient models, and advise on stipend in README.
+Risk: Inaccurate retrieval due to poor chunking. Mitigation: Use sentence boundaries and overlap; add tests for chunking.
+Risk: API rate limits or failures. Mitigation: Add try-except blocks and retries in code.
+Risk: UI not responsive for large ingests. Mitigation: Use Streamlit's session state and progress bars.
+Risk: Missing dependencies. Mitigation: Explicit requirements.txt.
+Risk: Artifacts not representative. Mitigation: Create detailed skeletons showing AI-native thinking.
+
+
+Decision Log 
+
+--Chose Python + Streamlit for rapid prototyping and UI simplicity, aligning with brief's time budget.
+--Opted for RAG with FAISS over in-memory lists for scalability, as it's recommended.
+--Selected OpenAI embeddings/LLM for ease of integration and quality; no custom models to keep within 6-8 hours.
+--Implemented mode switcher as bonus to demonstrate depth.
+--Structured code into app.py (UI), ingest.py (RAG pipeline), utils.py (helpers), prompts.py (prompt templates).
+--Added artifacts folder to show AI collaboration, tying to brief's "Show Your Thinking".
+--Included tests for core functions to ensure build quality.
