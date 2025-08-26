@@ -1,48 +1,53 @@
-from openai import OpenAI
-import tiktoken
-import nltk
-from nltk.tokenize import sent_tokenize
+import os
+import json
+import faiss
+import numpy as np
 
-# Reasoning: utils.py contains helper functions like client init,
-# token estimation, and chunking. Chunking logic ensures sentence 
-# boundaries using NLTK, accumulates sentences until ~450 tokens, 
-# then overlaps by 50 tokens (approx 1-2 sentences). 
-# Tiktoken is used for accurate OpenAI token counting. This keeps core utils reusable.
+VECTOR_DIR = "vectors"
+INDEX_PATH = os.path.join(VECTOR_DIR, "faiss.index")
+DOCS_PATH = os.path.join(VECTOR_DIR, "docs.jsonl")
 
-def get_openai_client():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY not set in .env")
-    return OpenAI(api_key=api_key)
-
-def estimate_tokens(text, model="gpt-4o-mini"):
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(text))
-
-def chunk_text(text, chunk_size=450, overlap=50):
-    sentences = sent_tokenize(text)
-    chunks = []
-    current_chunk = []
-    current_tokens = 0
+def load_index():
+    if not os.path.exists(INDEX_PATH) or not os.path.exists(DOCS_PATH):
+        raise RuntimeError("Vector index or docs metadata not found. Please run ingest first.")
     
-    for sent in sentences:
-        sent_tokens = estimate_tokens(sent)
-        if current_tokens + sent_tokens > chunk_size and current_chunk:
-            chunks.append(' '.join(current_chunk))
-            # Overlap: take last few sentences approx overlap tokens
-            overlap_chunk = []
-            overlap_tokens = 0
-            for prev_sent in reversed(current_chunk):
-                prev_tokens = estimate_tokens(prev_sent)
-                if overlap_tokens + prev_tokens > overlap:
-                    break
-                overlap_chunk.insert(0, prev_sent)
-                overlap_tokens += prev_tokens
-            current_chunk = overlap_chunk
-            current_tokens = overlap_tokens
-        current_chunk.append(sent)
-        current_tokens += sent_tokens
+    index = faiss.read_index(INDEX_PATH)
     
-    if current_chunk:
-        chunks.append(' '.join(current_chunk))
-    return chunks
+    docs = []
+    with open(DOCS_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            docs.append(json.loads(line.strip()))
+    
+    return index, docs
+
+def retrieve(query, k=4):
+    """
+    Retrieves top-k chunks for a given query.
+    Returns list of dicts with {text, meta}.
+    """
+    import openai
+    from dotenv import load_dotenv
+    load_dotenv()
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+
+    # Load FAISS index and docs
+    index, docs = load_index()
+
+    # Get query embedding
+    resp = openai.Embedding.create(
+        model="text-embedding-3-small",
+        input=query
+    )
+    query_vec = np.array(resp["data"][0]["embedding"], dtype=np.float32).reshape(1, -1)
+
+    # Search in FAISS
+    distances, indices = index.search(query_vec, k)
+    
+    results = []
+    for idx in indices[0]:
+        if idx < len(docs):
+            results.append({
+                "text": docs[idx]["text"],
+                "meta": docs[idx]["meta"]
+            })
+    return results
